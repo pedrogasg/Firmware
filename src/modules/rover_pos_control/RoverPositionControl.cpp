@@ -140,8 +140,8 @@ RoverPositionControl::vehicle_attitude_poll()
 }
 
 bool
-RoverPositionControl::control_position(const matrix::Vector2f &current_position,
-				       const matrix::Vector3f &ground_speed, const position_setpoint_triplet_s &pos_sp_triplet)
+RoverPositionControl::control_position(const matrix::Vector2f &current_position, const matrix::Vector3f &ground_speed,
+					const position_setpoint_triplet_s &pos_sp_triplet, const bool is_local)
 {
 	float dt = 0.01; // Using non zero value to a avoid division by zero
 
@@ -162,16 +162,8 @@ RoverPositionControl::control_position(const matrix::Vector2f &current_position,
 		/* get circle mode */
 		//bool was_circle_mode = _gnd_control.circle_mode();
 
-		/* current waypoint (the one currently heading for) */
-		matrix::Vector2f curr_wp((float)pos_sp_triplet.current.lat, (float)pos_sp_triplet.current.lon);
 
-		/* previous waypoint */
-		matrix::Vector2f prev_wp = curr_wp;
 
-		if (pos_sp_triplet.previous.valid) {
-			prev_wp(0) = (float)pos_sp_triplet.previous.lat;
-			prev_wp(1) = (float)pos_sp_triplet.previous.lon;
-		}
 
 		matrix::Vector2f ground_speed_2d(ground_speed);
 
@@ -210,9 +202,38 @@ RoverPositionControl::control_position(const matrix::Vector2f &current_position,
 				mission_throttle = _pos_sp_triplet.current.cruising_throttle;
 			}
 		}
+		/* current waypoint (the one currently heading for) */
+		matrix::Vector2f curr_wp
+		/* previous waypoint */
+		matrix::Vector2f prev_wp
+		/* distance to waypoint */
+		float dist
 
-		float dist = get_distance_to_next_waypoint(_global_pos.lat, _global_pos.lon,
+
+		if(is_local){
+			curr_wp((float)pos_sp_triplet.current.x, (float)pos_sp_triplet.current.y);
+
+			prev_wp = curr_wp;
+
+			if (pos_sp_triplet.previous.valid) {
+				prev_wp(0) = (float)pos_sp_triplet.previous.x;
+				prev_wp(1) = (float)pos_sp_triplet.previous.y;
+			}
+
+			dist = sqrtf(_local_pos.x * _pos_sp_triplet.current.x + _local_pos.y * _pos_sp_triplet.current.y);
+
+		} else {
+			curr_wp((float)pos_sp_triplet.current.lat, (float)pos_sp_triplet.current.lon);
+
+			prev_wp = curr_wp;
+
+			if (pos_sp_triplet.previous.valid) {
+				prev_wp(0) = (float)pos_sp_triplet.previous.lat;
+				prev_wp(1) = (float)pos_sp_triplet.previous.lon;
+			}
+			dist = get_distance_to_next_waypoint(_global_pos.lat, _global_pos.lon,
 				pos_sp_triplet.current.lat, pos_sp_triplet.current.lon);
+		}
 
 		bool should_idle = true;
 
@@ -289,13 +310,14 @@ RoverPositionControl::run()
 	px4_pollfd_struct_t fds[3];
 
 	/* Setup of loop */
-	fds[0].fd = _global_pos_sub;
+	fds[0].fd = _local_pos_sub;
 	fds[0].events = POLLIN;
 	fds[1].fd = _manual_control_sub;
 	fds[1].events = POLLIN;
 	fds[2].fd = _sensor_combined_sub;
 	fds[2].events = POLLIN;
-
+	fds[3].fd = _global_pos_sub;
+	fds[3].events = POLLIN;
 	while (!should_exit()) {
 
 		/* wait for up to 500ms for data */
@@ -320,6 +342,59 @@ RoverPositionControl::run()
 
 		/* only run controller if position changed */
 		if (fds[0].revents & POLLIN) {
+			perf_begin(_loop_perf);
+
+			/* load local copies */
+
+			orb_copy(ORB_ID(vehicle_local_position), _local_pos_sub, &_local_pos);
+
+			position_setpoint_triplet_poll();
+			vehicle_attitude_poll();
+
+			// update the reset counters in any case
+			_pos_reset_counter = _local_pos.xy_reset_counter;
+
+			matrix::Vector3f ground_speed(_local_pos.vx, _local_pos.vy,  _local_pos.vz);
+			matrix::Vector2f current_position((float)_local_pos.x, (float)_local_pos.y);
+
+			// This if statement depends upon short-circuiting: If !manual_mode, then control_position(...)
+			// should not be called.
+			// It doesn't really matter if it is called, it will just be bad for performance.
+			if (!manual_mode && control_position(current_position, ground_speed, _pos_sp_triplet, true)) {
+
+				/* XXX check if radius makes sense here */
+				float turn_distance = _param_l1_distance.get(); //_gnd_control.switch_distance(100.0f);
+
+				// publish status
+				position_controller_status_s pos_ctrl_status = {};
+
+				pos_ctrl_status.nav_roll = 0.0f;
+				pos_ctrl_status.nav_pitch = 0.0f;
+				pos_ctrl_status.nav_bearing = _gnd_control.nav_bearing();
+
+				pos_ctrl_status.target_bearing = _gnd_control.target_bearing();
+				pos_ctrl_status.xtrack_error = _gnd_control.crosstrack_error();
+
+				pos_ctrl_status.wp_dist = sqrtf(_local_pos.x * _pos_sp_triplet.current.x + _local_pos.y * _pos_sp_triplet.current.y);
+
+				pos_ctrl_status.acceptance_radius = turn_distance;
+				pos_ctrl_status.yaw_acceptance = NAN;
+
+				pos_ctrl_status.timestamp = hrt_absolute_time();
+
+				if (_pos_ctrl_status_pub != nullptr) {
+					orb_publish(ORB_ID(position_controller_status), _pos_ctrl_status_pub, &pos_ctrl_status);
+
+				} else {
+					_pos_ctrl_status_pub = orb_advertise(ORB_ID(position_controller_status), &pos_ctrl_status);
+				}
+
+			}
+
+
+			perf_end(_loop_perf);
+		}
+		if (fds[3].revents & POLLIN) {
 			perf_begin(_loop_perf);
 
 			/* load local copies */
@@ -351,7 +426,7 @@ RoverPositionControl::run()
 			// This if statement depends upon short-circuiting: If !manual_mode, then control_position(...)
 			// should not be called.
 			// It doesn't really matter if it is called, it will just be bad for performance.
-			if (!manual_mode && control_position(current_position, ground_speed, _pos_sp_triplet)) {
+			if (!manual_mode && control_position(current_position, ground_speed, _pos_sp_triplet, false)) {
 
 				/* XXX check if radius makes sense here */
 				float turn_distance = _param_l1_distance.get(); //_gnd_control.switch_distance(100.0f);
