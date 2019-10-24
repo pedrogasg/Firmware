@@ -220,8 +220,8 @@ RoverPositionControl::control_position(const matrix::Vector2f &current_position,
 				prev_wp(0) = (float)pos_sp_triplet.previous.x;
 				prev_wp(1) = (float)pos_sp_triplet.previous.y;
 			}
-
-			dist = sqrtf(_local_pos.x * _pos_sp_triplet.current.x + _local_pos.y * _pos_sp_triplet.current.y);
+			float dx = _local_pos.x - _pos_sp_triplet.current.x, dy = _local_pos.y - _pos_sp_triplet.current.y;
+			dist = sqrtf(dx * dx + dy * dy);
 
 		} else {
 			curr_wp(0) = (float)pos_sp_triplet.current.lat;
@@ -244,10 +244,11 @@ RoverPositionControl::control_position(const matrix::Vector2f &current_position,
 			// move around when it should be parked. So, I try to get the rover within loiter_radius/2, but then
 			// once I reach that point, I don't move until I'm outside of loiter_radius.
 			// TODO: Find out if there's a better measurement to use than loiter_radius.
-			if (dist > pos_sp_triplet.current.loiter_radius) {
+			float lr = pos_sp_triplet.current.loiter_radius; //_param_nav_loiter_rad.get();
+			if (dist > lr) {
 				_waypoint_reached = false;
 
-			} else if (dist <= pos_sp_triplet.current.loiter_radius / 2) {
+			} else if (dist <= lr / 2) {
 				_waypoint_reached = true;
 			}
 
@@ -337,6 +338,22 @@ RoverPositionControl::run()
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_vehicle_attitude_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
+
+
+	memcpy(_dbg.name, "debug_rover", 10);
+	_dbg.name[sizeof(_dbg.name) - 1] = '\0'; // enforce null termination
+	_dbg.x = 0.0f;
+	_dbg.y = 0.0f;
+	_dbg.z = 0.0f;
+
+	memcpy(_pos.name, "debug_position", 10);
+	_pos.name[sizeof(_pos.name) - 1] = '\0'; // enforce null termination
+	_pos.x = 0.0f;
+	_pos.y = 0.0f;
+	_pos.z = 0.0f;
+
+	_pub_dbg = orb_advertise(ORB_ID(debug_vect), &_dbg);
+	_pub_pos = orb_advertise(ORB_ID(debug_vect), &_pos);
 
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
@@ -438,7 +455,7 @@ RoverPositionControl::run()
 		if (fds[3].revents & POLLIN) {
 			perf_begin(_loop_perf);
 
-			/* load local copies */
+			// load local copies
 			orb_copy(ORB_ID(vehicle_global_position), _global_pos_sub, &_global_pos);
 			orb_copy(ORB_ID(vehicle_local_position), _local_pos_sub, &_local_pos);
 
