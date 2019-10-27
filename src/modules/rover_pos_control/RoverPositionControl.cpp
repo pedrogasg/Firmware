@@ -244,7 +244,7 @@ RoverPositionControl::control_position(const matrix::Vector2f &current_position,
 			// move around when it should be parked. So, I try to get the rover within loiter_radius/2, but then
 			// once I reach that point, I don't move until I'm outside of loiter_radius.
 			// TODO: Find out if there's a better measurement to use than loiter_radius.
-			float lr = pos_sp_triplet.current.loiter_radius; //_param_nav_loiter_rad.get();
+			float lr = _param_loiter_rad.get();
 			if (dist > lr) {
 				_waypoint_reached = false;
 
@@ -338,22 +338,6 @@ RoverPositionControl::run()
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_vehicle_attitude_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
-
-
-	memcpy(_dbg.name, "debug_rover", 10);
-	_dbg.name[sizeof(_dbg.name) - 1] = '\0'; // enforce null termination
-	_dbg.x = 0.0f;
-	_dbg.y = 0.0f;
-	_dbg.z = 0.0f;
-
-	memcpy(_pos.name, "debug_position", 10);
-	_pos.name[sizeof(_pos.name) - 1] = '\0'; // enforce null termination
-	_pos.x = 0.0f;
-	_pos.y = 0.0f;
-	_pos.z = 0.0f;
-
-	_pub_dbg = orb_advertise(ORB_ID(debug_vect), &_dbg);
-	_pub_pos = orb_advertise(ORB_ID(debug_vect), &_pos);
 
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
@@ -452,6 +436,7 @@ RoverPositionControl::run()
 
 			perf_end(_loop_perf);
 		}
+		/*
 		if (fds[3].revents & POLLIN) {
 			perf_begin(_loop_perf);
 
@@ -525,7 +510,7 @@ RoverPositionControl::run()
 
 			perf_end(_loop_perf);
 		}
-
+		*/
 		if (fds[1].revents & POLLIN) {
 
 			// This should be copied even if not in manual mode. Otherwise, the poll(...) call will keep

@@ -286,3 +286,17 @@ PARAM_DEFINE_FLOAT(GND_WHEEL_BASE, 2.0f);
  * @group Rover Position Control
  */
 PARAM_DEFINE_FLOAT(GND_MAX_ANG, 0.7854f);
+
+/**
+ * Loiter radius (FW only)
+ *
+ * Default value of loiter radius for missions, Hold mode, Return mode, etc. (fixedwing only).
+ *
+ * @unit m
+ * @min 0.05
+ * @max 5
+ * @decimal 1
+ * @increment 0.5
+ * @group Mission
+ */
+PARAM_DEFINE_FLOAT(GND_LOITER_RAD, 1f);
