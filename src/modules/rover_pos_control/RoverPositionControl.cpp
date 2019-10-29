@@ -402,34 +402,41 @@ RoverPositionControl::run()
 			// This if statement depends upon short-circuiting: If !manual_mode, then control_position(...)
 			// should not be called.
 			// It doesn't really matter if it is called, it will just be bad for performance.
-			if (!manual_mode && control_position(current_position, ground_speed, _pos_sp_triplet, true)) {
+			if (!manual_mode && _control_mode.flag_control_position_enabled) {
 
-				/* XXX check if radius makes sense here */
-				float turn_distance = _param_l1_distance.get(); //_gnd_control.switch_distance(100.0f);
+				if (control_position(current_position, ground_speed, _pos_sp_triplet, true)) {
 
-				// publish status
-				position_controller_status_s pos_ctrl_status = {};
+					/* XXX check if radius makes sense here */
+					float turn_distance = _param_l1_distance.get(); //_gnd_control.switch_distance(100.0f);
 
-				pos_ctrl_status.nav_roll = 0.0f;
-				pos_ctrl_status.nav_pitch = 0.0f;
-				pos_ctrl_status.nav_bearing = _gnd_control.nav_bearing();
+					// publish status
+					position_controller_status_s pos_ctrl_status = {};
 
-				pos_ctrl_status.target_bearing = _gnd_control.target_bearing();
-				pos_ctrl_status.xtrack_error = _gnd_control.crosstrack_error();
+					pos_ctrl_status.nav_roll = 0.0f;
+					pos_ctrl_status.nav_pitch = 0.0f;
+					pos_ctrl_status.nav_bearing = _gnd_control.nav_bearing();
 
-				pos_ctrl_status.wp_dist = sqrtf(_local_pos.x * _pos_sp_triplet.current.x + _local_pos.y * _pos_sp_triplet.current.y);
+					pos_ctrl_status.target_bearing = _gnd_control.target_bearing();
+					pos_ctrl_status.xtrack_error = _gnd_control.crosstrack_error();
 
-				pos_ctrl_status.acceptance_radius = turn_distance;
-				pos_ctrl_status.yaw_acceptance = NAN;
+					pos_ctrl_status.wp_dist = sqrtf(_local_pos.x * _pos_sp_triplet.current.x + _local_pos.y * _pos_sp_triplet.current.y);
 
-				pos_ctrl_status.timestamp = hrt_absolute_time();
+					pos_ctrl_status.acceptance_radius = turn_distance;
+					pos_ctrl_status.yaw_acceptance = NAN;
 
-				if (_pos_ctrl_status_pub != nullptr) {
-					orb_publish(ORB_ID(position_controller_status), _pos_ctrl_status_pub, &pos_ctrl_status);
+					pos_ctrl_status.timestamp = hrt_absolute_time();
 
-				} else {
-					_pos_ctrl_status_pub = orb_advertise(ORB_ID(position_controller_status), &pos_ctrl_status);
+					if (_pos_ctrl_status_pub != nullptr) {
+						orb_publish(ORB_ID(position_controller_status), _pos_ctrl_status_pub, &pos_ctrl_status);
+
+					} else {
+						_pos_ctrl_status_pub = orb_advertise(ORB_ID(position_controller_status), &pos_ctrl_status);
+					}
+
 				}
+			} else if (!manual_mode && _control_mode.flag_control_velocity_enabled) {
+
+				control_velocity(current_velocity, _pos_sp_triplet);
 
 			}
 
