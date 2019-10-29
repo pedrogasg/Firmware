@@ -398,7 +398,7 @@ RoverPositionControl::run()
 
 			matrix::Vector3f ground_speed(_local_pos.vx, _local_pos.vy,  _local_pos.vz);
 			matrix::Vector2f current_position((float)_local_pos.x, (float)_local_pos.y);
-
+			matrix::Vector3f current_velocity(_local_pos.vx, _local_pos.vy, _local_pos.vz);
 			// This if statement depends upon short-circuiting: If !manual_mode, then control_position(...)
 			// should not be called.
 			// It doesn't really matter if it is called, it will just be bad for performance.
