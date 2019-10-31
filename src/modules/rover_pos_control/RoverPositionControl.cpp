@@ -418,8 +418,8 @@ RoverPositionControl::run()
 
 					pos_ctrl_status.target_bearing = _gnd_control.target_bearing();
 					pos_ctrl_status.xtrack_error = _gnd_control.crosstrack_error();
-
-					pos_ctrl_status.wp_dist = sqrtf(_local_pos.x * _pos_sp_triplet.current.x + _local_pos.y * _pos_sp_triplet.current.y);
+					float dx = _local_pos.x - _pos_sp_triplet.current.x, dy = _local_pos.y - _pos_sp_triplet.current.y;
+					pos_ctrl_status.wp_dist = sqrtf(dx * dx + dy * dy);
 
 					pos_ctrl_status.acceptance_radius = turn_distance;
 					pos_ctrl_status.yaw_acceptance = NAN;
