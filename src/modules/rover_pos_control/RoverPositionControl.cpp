@@ -255,16 +255,22 @@ RoverPositionControl::control_position(const matrix::Vector2f &current_position,
 			should_idle = _waypoint_reached;
 
 		} else if (pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_POSITION ||
-			   pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF ||
-			   pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND) {
+			   pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF) {
 			should_idle = false;
 		}
 
 
 		if (should_idle) {
 			_act_controls.control[actuator_controls_s::INDEX_YAW] = 0.0f;
-			_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
-
+			if(_waypoint_reached || pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND)
+			{
+				_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _param_brake_trust.get();
+			}
+			else
+			{
+				_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
+			}
+			
 		} else {
 
 			/* waypoint is a plain navigation waypoint or the takeoff waypoint, does not matter */
@@ -395,6 +401,13 @@ RoverPositionControl::run()
 
 			// update the reset counters in any case
 			_pos_reset_counter = _local_pos.xy_reset_counter;
+
+			
+			if(_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND)
+			{
+				_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _param_brake_trust.get();
+				_act_controls.control[actuator_controls_s::INDEX_YAW] = 0.0f;
+			}
 
 			matrix::Vector3f ground_speed(_local_pos.vx, _local_pos.vy,  _local_pos.vz);
 			matrix::Vector2f current_position((float)_local_pos.x, (float)_local_pos.y);

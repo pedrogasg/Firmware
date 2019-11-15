@@ -297,6 +297,20 @@ PARAM_DEFINE_FLOAT(GND_MAX_ANG, 0.7854f);
  * @max 5
  * @decimal 1
  * @increment 0.5
- * @group Mission
+ * @group Rover Position Control
  */
 PARAM_DEFINE_FLOAT(GND_LOITER_RAD, 1f);
+
+/**
+ * Break trust
+ *
+ * Negative trust applied to brake.
+ *
+ * @unit m/s
+ * @min -1.00
+ * @max 0.00
+ * @decimal 2
+ * @increment 0.1
+ * @group Rover Position Control
+ */
+PARAM_DEFINE_FLOAT(GND_BRAKE_TRUST, -0.3f);
