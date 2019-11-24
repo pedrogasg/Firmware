@@ -70,6 +70,7 @@
 #include <uORB/uORB.h>
 #include <platforms/px4_module.h>
 #include <platforms/px4_module_params.h>
+#include <uORB/topics/debug_key_value.h>
 
 using matrix::Dcmf;
 
@@ -100,6 +101,9 @@ public:
 private:
 	orb_advert_t	_pos_ctrl_status_pub{nullptr};		/**< navigation capabilities publication */
 	orb_advert_t    _actuator_controls_pub{nullptr};	/**< actuator controls publication */
+	struct debug_key_value_s dbg_key;
+
+	orb_advert_t pub_dbg = orb_advertise(ORB_ID(debug_key_value), &dbg_key);
 
 	int		_control_mode_sub{-1};		        /**< control mode subscription */
 	int		_global_pos_sub{-1};

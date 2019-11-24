@@ -262,14 +262,7 @@ RoverPositionControl::control_position(const matrix::Vector2f &current_position,
 
 		if (should_idle) {
 			_act_controls.control[actuator_controls_s::INDEX_YAW] = 0.0f;
-			if(_waypoint_reached || pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND)
-			{
-				_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _param_brake_trust.get();
-			}
-			else
-			{
-				_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
-			}
+			_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
 			
 		} else {
 
@@ -344,7 +337,8 @@ RoverPositionControl::run()
 	_pos_sp_triplet_sub = orb_subscribe(ORB_ID(position_setpoint_triplet));
 	_vehicle_attitude_sub = orb_subscribe(ORB_ID(vehicle_attitude));
 	_sensor_combined_sub = orb_subscribe(ORB_ID(sensor_combined));
-
+	strncpy(dbg_key.key, "breaking", 10);
+	dbg_key.value = 0.0f;
 	/* rate limit control mode updates to 5Hz */
 	orb_set_interval(_control_mode_sub, 200);
 
@@ -401,13 +395,31 @@ RoverPositionControl::run()
 
 			// update the reset counters in any case
 			_pos_reset_counter = _local_pos.xy_reset_counter;
+			if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LOITER) {
+				dbg_key.value = 1.0f;
 
+			} else if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND) {
+				dbg_key.value = 2.0f;
+
+			} else if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_TAKEOFF) {
+				dbg_key.value = 3.0f;
+
+			} else if (_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_IDLE) {
+				dbg_key.value = 4.0f;
+
+			} else {
+				dbg_key.value = 5.0f;
+			}
 			
 			if(_pos_sp_triplet.current.type == position_setpoint_s::SETPOINT_TYPE_LAND)
 			{
 				_act_controls.control[actuator_controls_s::INDEX_THROTTLE] = _param_brake_trust.get();
 				_act_controls.control[actuator_controls_s::INDEX_YAW] = 0.0f;
+				dbg_key.value = -2.0f;
+			}else{
+				//dbg_key.value = _param_brake_trust.get();
 			}
+			orb_publish(ORB_ID(debug_key_value), pub_dbg, &dbg_key);
 
 			matrix::Vector3f ground_speed(_local_pos.vx, _local_pos.vy,  _local_pos.vz);
 			matrix::Vector2f current_position((float)_local_pos.x, (float)_local_pos.y);
